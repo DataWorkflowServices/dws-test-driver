@@ -1,0 +1,6 @@
+domain: cray.hpe.com
+layout:
+- go.kubebuilder.io/v3
+projectName: dws-test-driver
+repo: github.com/DataWorkflowServices/dws-test-driver
+version: "3"
