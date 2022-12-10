@@ -19,25 +19,30 @@ package main
 import (
 	"flag"
 	"os"
+	"runtime"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/runtime"
+	_ "github.com/HewlettPackard/dws/config/crd/bases"
+	_ "github.com/HewlettPackard/dws/config/webhook"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/DataWorkflowServices/dws-test-driver/controllers"
 	//+kubebuilder:scaffold:imports
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = kruntime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
@@ -56,14 +61,17 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	opts := zap.Options{
+	opts := zapcr.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
+	zaplogger := zapcr.New(zapcr.WriteTo(os.Stdout), zapcr.Encoder(encoder))
+	ctrl.SetLogger(zaplogger)
 
+	setupLog.Info("GOMAXPROCS", "value", runtime.GOMAXPROCS(0))
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -91,6 +99,7 @@ func main() {
 	if err = (&controllers.WorkflowReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("controllers").WithName("TestDriver"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Workflow")
 		os.Exit(1)

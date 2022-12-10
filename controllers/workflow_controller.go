@@ -18,13 +18,20 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
+	dwdparse "github.com/HewlettPackard/dws/utils/dwdparse"
+	"github.com/HewlettPackard/dws/utils/updater"
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const DRIVERID string = "tester"
 
 // WorkflowReconciler reconciles a Workflow object
 type WorkflowReconciler struct {
@@ -46,7 +53,7 @@ type WorkflowReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.0/pkg/reconcile
-func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := r.Log.WithValues("Workflow", req.NamespacedName)
 	log.Info("Reconciling Workflow")
 
@@ -54,6 +61,84 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	workflow := &dwsv1alpha1.Workflow{}
 	if err := r.Get(ctx, req.NamespacedName, workflow); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Nothing to do
+	if workflow.Status.Ready {
+		return ctrl.Result{}, nil
+	}
+
+	// Transitioning states. Nothing to do
+	if workflow.Status.State != workflow.Spec.DesiredState {
+		return ctrl.Result{}, nil
+	}
+
+	// The workflow is being deleted. Nothing to do
+	if !workflow.GetDeletionTimestamp().IsZero() {
+		return ctrl.Result{}, nil
+	}
+
+	log.Info("Reconciling Workflow Driver Statuses")
+	desiredState := workflow.Spec.DesiredState
+	directives := workflow.Spec.DWDirectives
+
+	// Create a status updater that handles the call to r.Update() if any of the fields
+	// in workflow.Status{} change. This is necessary since Status is not a subresource
+	// of the workflow.
+	statusUpdater := updater.NewStatusUpdater[*dwsv1alpha1.WorkflowStatus](workflow)
+	defer func() { err = statusUpdater.CloseWithUpdate(ctx, r, err) }()
+
+	// Check workflow for test driver entries
+	for driverStatusIndex, driverStatus := range workflow.Status.Drivers {
+
+		// Skip driverStatus entries of other drivers
+		if DRIVERID != driverStatus.DriverID {
+			continue
+		}
+
+		// Skip driverStatus entries that aren't relevant
+		if desiredState != driverStatus.WatchState {
+			continue
+		}
+
+		// Skip driverStatus entries that have already completed
+		if driverStatus.Completed {
+			continue
+		}
+
+		// Skip driverStatus entries with recorded errors
+		if dwsv1alpha1.StatusError == driverStatus.Status {
+			continue
+		}
+
+		var directive = directives[driverStatus.DWDIndex]
+		args, err := dwdparse.BuildArgsMap(directive)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Could not parse driver args from directive: %s\n", directive))
+			return ctrl.Result{}, err
+		}
+
+		switch {
+		case args["action"] == "complete":
+			log.Info("Completing workflow")
+			driverStatus.Completed = true
+			driverStatus.Status = dwsv1alpha1.StatusCompleted
+			ct := metav1.NowMicro()
+			driverStatus.CompleteTime = &ct
+		case args["action"] == "wait":
+			// The driver status will be marked complete by external process
+			// Nothing to do
+			log.Info(fmt.Sprintf("Driver waiting on external completion for State: %s", desiredState))
+			continue
+		case args["action"] == "error":
+			log.Info("Failing workflow")
+			driverStatus.Status = dwsv1alpha1.StatusError
+			driverStatus.Error = strings.ReplaceAll(args["message"], "_", " ")
+		default:
+			panic(fmt.Sprintf("unsupported action in directive: %s", directive))
+		}
+
+		workflow.Status.Drivers[driverStatusIndex] = driverStatus
 	}
 
 	return ctrl.Result{}, nil
