@@ -18,10 +18,13 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
+	dwsctrls "github.com/HewlettPackard/dws/controllers"
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
@@ -35,7 +38,11 @@ import (
 	//"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	zapcr "sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	//+kubebuilder:scaffold:imports
+
+	_ "github.com/HewlettPackard/dws/config/crd/bases"
+	_ "github.com/HewlettPackard/dws/config/webhook"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -53,6 +60,18 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
+func loadTestDWDirectiveRuleset(filename string) (dwsv1alpha1.DWDirectiveRule, error) {
+	ruleset := dwsv1alpha1.DWDirectiveRule{}
+
+	bytes, err := os.ReadFile(filename)
+	if err != nil {
+		return ruleset, err
+	}
+
+	err = yaml.Unmarshal(bytes, &ruleset)
+	return ruleset, err
+}
+
 var _ = BeforeSuite(func() {
 	encoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
 	zaplogger := zapcr.New(zapcr.WriteTo(GinkgoWriter), zapcr.Encoder(encoder), zapcr.UseDevMode(true))
@@ -60,13 +79,18 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
+	webhookPaths := []string{
+		filepath.Join("..", "vendor", "github.com", "HewlettPackard", "dws", "config", "webhook"),
+	}
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
+		WebhookInstallOptions: envtest.WebhookInstallOptions{Paths: webhookPaths},
+		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "config", "crd", "bases"),
+			// filepath.Join("..", "config", "crd", "bases"),
 			filepath.Join("..", "vendor", "github.com", "HewlettPackard", "dws", "config", "crd", "bases"),
 		},
-		ErrorIfCRDPathMissing: false,
 	}
 
 	var err error
@@ -100,6 +124,13 @@ var _ = BeforeSuite(func() {
 
 	err = (&WorkflowReconciler{
 		Client: k8sManager.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("test-workflow"),
+		Scheme: testEnv.Scheme,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&dwsctrls.WorkflowReconciler{
+		Client: k8sManager.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Workflow"),
 		Scheme: testEnv.Scheme,
 	}).SetupWithManager(k8sManager)
@@ -113,6 +144,13 @@ var _ = BeforeSuite(func() {
 		err := k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
+
+	// Load the NNF ruleset to enable the webhook to parse #DW directives
+	ruleset, err := loadTestDWDirectiveRuleset(filepath.Join("..", "config", "dws", "test-ruleset.yaml"))
+	Expect(err).ToNot(HaveOccurred())
+
+	ruleset.Namespace = "default"
+	Expect(k8sClient.Create(context.Background(), &ruleset)).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {

@@ -10,19 +10,11 @@ rules:
   resources:
   - workflows
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
   - update
   - watch
-- apiGroups:
-  - dws.cray.hpe.com
-  resources:
-  - workflows/finalizers
-  verbs:
-  - update
 - apiGroups:
   - dws.cray.hpe.com
   resources:

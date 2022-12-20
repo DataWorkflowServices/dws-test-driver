@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
@@ -40,9 +39,8 @@ type WorkflowReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=workflows,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=workflows,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=workflows/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=workflows/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -63,6 +61,11 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// The workflow is being deleted. Nothing to do
+	if !workflow.GetDeletionTimestamp().IsZero() {
+		return ctrl.Result{}, nil
+	}
+
 	// Nothing to do
 	if workflow.Status.Ready {
 		return ctrl.Result{}, nil
@@ -70,11 +73,6 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 
 	// Transitioning states. Nothing to do
 	if workflow.Status.State != workflow.Spec.DesiredState {
-		return ctrl.Result{}, nil
-	}
-
-	// The workflow is being deleted. Nothing to do
-	if !workflow.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
 	}
 
@@ -114,7 +112,7 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 		var directive = directives[driverStatus.DWDIndex]
 		args, err := dwdparse.BuildArgsMap(directive)
 		if err != nil {
-			log.Error(err, fmt.Sprintf("Could not parse driver args from directive: %s\n", directive))
+			log.Error(err, "Could not parse driver args from directive", "directive", directive)
 			return ctrl.Result{}, err
 		}
 
@@ -128,14 +126,15 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 		case args["action"] == "wait":
 			// The driver status will be marked complete by external process
 			// Nothing to do
-			log.Info(fmt.Sprintf("Driver waiting on external completion for State: %s", desiredState))
+			log.Info("Driver waiting on external completion", "desired_state", desiredState)
 			continue
 		case args["action"] == "error":
 			log.Info("Failing workflow")
 			driverStatus.Status = dwsv1alpha1.StatusError
 			driverStatus.Error = strings.ReplaceAll(args["message"], "_", " ")
 		default:
-			panic(fmt.Sprintf("unsupported action in directive: %s", directive))
+			log.Error(err, "Unsupported action in directive", "directive", directive)
+			return ctrl.Result{}, err
 		}
 
 		workflow.Status.Drivers[driverStatusIndex] = driverStatus

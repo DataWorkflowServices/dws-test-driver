@@ -9,26 +9,39 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/apimachinery/pkg/types"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
 )
 
+func ignoreExactTime(x, y *metav1.MicroTime) bool {
+	// Don't compare times, just check that a time was set
+	bothSet := !(reflect.ValueOf(x).IsNil() || reflect.ValueOf(y).IsNil())
+	bothUnset := reflect.ValueOf(x).IsNil() && reflect.ValueOf(y).IsNil()
+	return bothSet || bothUnset
+}
+
 var _ = Describe("Workflow Controller Test", func() {
 
 	var (
-		wf *dwsv1alpha1.Workflow
+		wf                     *dwsv1alpha1.Workflow
+		key                    types.NamespacedName
+		expectedDriverStatuses []dwsv1alpha1.WorkflowDriverStatus
 	)
 
 	BeforeEach(func() {
 		wfid := uuid.NewString()[0:8]
+		key = types.NamespacedName{
+			Name:      "test-workflow-" + wfid,
+			Namespace: corev1.NamespaceDefault,
+		}
+
 		wf = &dwsv1alpha1.Workflow{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      wfid,
-				Namespace: corev1.NamespaceDefault,
+				Name:      key.Name,
+				Namespace: key.Namespace,
 			},
 			Spec: dwsv1alpha1.WorkflowSpec{
 				DesiredState: dwsv1alpha1.StateProposal,
@@ -38,114 +51,58 @@ var _ = Describe("Workflow Controller Test", func() {
 				GroupID:      0,
 				DWDirectives: []string{},
 			},
-			Status: dwsv1alpha1.WorkflowStatus{
-				State:  dwsv1alpha1.StateProposal,
-				Ready:  false,
-				Status: dwsv1alpha1.StatusDriverWait,
-			},
 		}
+		Expect(k8sClient.Get(context.TODO(), key, wf)).ToNot(Succeed())
+	})
+
+	JustAfterEach(func() {
+		Expect(k8sClient.Create(context.TODO(), wf)).To(Succeed())
+		Eventually(func(g Gomega) []dwsv1alpha1.WorkflowDriverStatus {
+			g.Expect(k8sClient.Get(context.TODO(), key, wf)).To(Succeed())
+			return wf.Status.Drivers
+		}).Should(BeComparableTo(expectedDriverStatuses,
+			cmp.Comparer(ignoreExactTime),
+		))
 	})
 
 	AfterEach(func() {
 		if wf != nil {
 			Expect(k8sClient.Delete(context.TODO(), wf)).To(Succeed())
-
-			wfExpected := &dwsv1alpha1.Workflow{}
 			Eventually(func() error { // Delete can still return the cached object. Wait until the object is no longer present.
-				return k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(wf), wfExpected)
+				return k8sClient.Get(context.TODO(), key, wf)
 			}).ShouldNot(Succeed())
 		}
 	})
 
 	It("Can complete Workflow driver states", func() {
+		state := "Proposal"
 		action := "complete"
 		wf.Spec.DWDirectives = []string{
-			fmt.Sprintf("#DW STATUS action=%s", action),
+			fmt.Sprintf("#DW %s action=%s", state, action),
 		}
 
-		driverStatus := dwsv1alpha1.WorkflowDriverStatus{
-			DriverID:   DRIVERID,
-			DWDIndex:   0,
-			WatchState: dwsv1alpha1.StateProposal,
+		aTimeWasSet := metav1.NowMicro()
+		expectedDriverStatus := dwsv1alpha1.WorkflowDriverStatus{
+			DriverID:     DRIVERID,
+			DWDIndex:     0,
+			WatchState:   dwsv1alpha1.StateProposal,
+			Status:       dwsv1alpha1.StatusCompleted,
+			Completed:    true,
+			CompleteTime: &aTimeWasSet,
 		}
 
-		// Set a bunch of other statuses that should remain unchanged
-		statusWrongDriver := dwsv1alpha1.WorkflowDriverStatus{
-			DriverID:   "notMyDriver",
-			DWDIndex:   0,
-			WatchState: dwsv1alpha1.StateProposal,
+		expectedDriverStatuses = []dwsv1alpha1.WorkflowDriverStatus{
+			expectedDriverStatus,
 		}
-		statusWrongWatchState := dwsv1alpha1.WorkflowDriverStatus{
-			DriverID:   DRIVERID,
-			DWDIndex:   0,
-			WatchState: dwsv1alpha1.StateDataIn,
-		}
-		statusCompleted := dwsv1alpha1.WorkflowDriverStatus{
-			DriverID:   DRIVERID,
-			DWDIndex:   0,
-			WatchState: dwsv1alpha1.StateProposal,
-			Completed:  true,
-		}
-		statusError := dwsv1alpha1.WorkflowDriverStatus{
-			DriverID:   DRIVERID,
-			DWDIndex:   0,
-			WatchState: dwsv1alpha1.StateProposal,
-			Status:     dwsv1alpha1.StatusError,
-		}
-		wf.Status.Drivers = []dwsv1alpha1.WorkflowDriverStatus{
-			driverStatus,
-			statusWrongDriver,
-			statusWrongWatchState,
-			statusCompleted,
-			statusError,
-		}
-
-		ct := metav1.NowMicro()
-		expectedDriverStatuses := []dwsv1alpha1.WorkflowDriverStatus{
-			{
-				DriverID:     DRIVERID,
-				DWDIndex:     0,
-				WatchState:   dwsv1alpha1.StateProposal,
-				Status:       dwsv1alpha1.StatusCompleted,
-				Completed:    true,
-				CompleteTime: &ct,
-			},
-			statusWrongDriver,
-			statusWrongWatchState,
-			statusCompleted,
-			statusError,
-		}
-
-		Expect(k8sClient.Create(context.TODO(), wf)).To(Succeed())
-
-		Eventually(func(g Gomega) []dwsv1alpha1.WorkflowDriverStatus {
-			returnWf := &dwsv1alpha1.Workflow{}
-			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(wf), returnWf)).To(Succeed())
-			driverStatus = returnWf.Status.Drivers[0]
-			return returnWf.Status.Drivers
-		}).Should(BeComparableTo(expectedDriverStatuses,
-			cmp.Comparer(func(x, y *metav1.MicroTime) bool {
-				// Don't compare times, just check for Nil
-				bothSet := !(reflect.ValueOf(x).IsNil() || reflect.ValueOf(y).IsNil())
-				bothUnset := reflect.ValueOf(x).IsNil() && reflect.ValueOf(y).IsNil()
-				return bothSet || bothUnset
-			}),
-		))
 	})
 
 	It("Can set Workflow driver errors", func() {
+		state := "Proposal"
 		action := "error"
 		message := "Test_error_message"
 		wf.Spec.DWDirectives = []string{
-			fmt.Sprintf("#DW STATUS action=%s message=%s", action, message),
+			fmt.Sprintf("#DW %s action=%s message=%s", state, action, message),
 		}
-
-		driverStatus := dwsv1alpha1.WorkflowDriverStatus{
-			DriverID:   DRIVERID,
-			DWDIndex:   0,
-			WatchState: dwsv1alpha1.StateProposal,
-		}
-		wf.Status.Drivers = []dwsv1alpha1.WorkflowDriverStatus{driverStatus}
 
 		expectedDriverStatus := dwsv1alpha1.WorkflowDriverStatus{
 			DriverID:   DRIVERID,
@@ -155,41 +112,28 @@ var _ = Describe("Workflow Controller Test", func() {
 			Error:      "Test error message",
 		}
 
-		Expect(k8sClient.Create(context.TODO(), wf)).To(Succeed())
-
-		Eventually(func(g Gomega) dwsv1alpha1.WorkflowDriverStatus {
-			returnWf := &dwsv1alpha1.Workflow{}
-			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(wf), returnWf)).To(Succeed())
-			return returnWf.Status.Drivers[0]
-		}).Should(Equal(expectedDriverStatus))
+		expectedDriverStatuses = []dwsv1alpha1.WorkflowDriverStatus{
+			expectedDriverStatus,
+		}
 	})
 
 	It("Can No-op Workflow driver statuses", func() {
+		state := "Proposal"
 		action := "wait"
 		wf.Spec.DWDirectives = []string{
-			fmt.Sprintf("#DW STATUS action=%s", action),
+			fmt.Sprintf("#DW %s action=%s", state, action),
 		}
 
-		driverStatus := dwsv1alpha1.WorkflowDriverStatus{
-			DriverID:   DRIVERID,
-			DWDIndex:   0,
-			WatchState: dwsv1alpha1.StateProposal,
-		}
-		wf.Status.Drivers = []dwsv1alpha1.WorkflowDriverStatus{driverStatus}
-
-		// The driver status should be unchanged
 		expectedDriverStatus := dwsv1alpha1.WorkflowDriverStatus{
 			DriverID:   DRIVERID,
 			DWDIndex:   0,
 			WatchState: dwsv1alpha1.StateProposal,
+			Status:     dwsv1alpha1.StatusPending,
+			Completed:  false,
 		}
 
-		Expect(k8sClient.Create(context.TODO(), wf)).To(Succeed())
-
-		Eventually(func(g Gomega) dwsv1alpha1.WorkflowDriverStatus {
-			returnWf := &dwsv1alpha1.Workflow{}
-			g.Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(wf), returnWf)).To(Succeed())
-			return returnWf.Status.Drivers[0]
-		}).Should(Equal(expectedDriverStatus))
+		expectedDriverStatuses = []dwsv1alpha1.WorkflowDriverStatus{
+			expectedDriverStatus,
+		}
 	})
 })

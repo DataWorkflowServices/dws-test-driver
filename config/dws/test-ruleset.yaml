@@ -1,7 +1,7 @@
 apiVersion: dws.cray.hpe.com/v1alpha1
 kind: DWDirectiveRule
 metadata:
-  name: dws-test-driver-directive-rules
+  name: rules
 spec:
   - command: Proposal
     watchStates: Proposal

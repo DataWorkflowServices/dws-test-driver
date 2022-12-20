@@ -26,8 +26,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
-	_ "github.com/HewlettPackard/dws/config/crd/bases"
-	_ "github.com/HewlettPackard/dws/config/webhook"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
