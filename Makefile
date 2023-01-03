@@ -85,7 +85,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: container-unit-test
 container-unit-test: ## Build docker image with the manager and execute unit tests.
-	docker build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --load --target testing .
+	docker build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
 	docker run --rm -t --name $@-dws-test-driver  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
