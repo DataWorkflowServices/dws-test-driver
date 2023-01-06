@@ -1,0 +1,82 @@
+apiVersion: dws.cray.hpe.com/v1alpha1
+kind: DWDirectiveRule
+metadata:
+  name: rules
+spec:
+  - command: Proposal
+    watchStates: Proposal
+    driverLabel: tester
+    ruleDefs:
+      - key: action
+        type: string
+        isRequired: true
+        isValueRequired: true
+      - key: message
+        type: string
+        isValueRequired: true
+  - command: Setup
+    watchStates: Setup
+    driverLabel: tester
+    ruleDefs:
+      - key: action
+        type: string
+        isRequired: true
+        isValueRequired: true
+      - key: message
+        type: string
+        isValueRequired: true
+  - command: DataIn
+    watchStates: DataIn
+    driverLabel: tester
+    ruleDefs:
+      - key: action
+        type: string
+        isRequired: true
+        isValueRequired: true
+      - key: message
+        type: string
+        isValueRequired: true
+  - command: PreRun
+    watchStates: PreRun
+    driverLabel: tester
+    ruleDefs:
+      - key: action
+        type: string
+        isRequired: true
+        isValueRequired: true
+      - key: message
+        type: string
+        isValueRequired: true
+  - command: PostRun
+    watchStates: PostRun
+    driverLabel: tester
+    ruleDefs:
+      - key: action
+        type: string
+        isRequired: true
+        isValueRequired: true
+      - key: message
+        type: string
+        isValueRequired: true
+  - command: DataOut
+    watchStates: DataOut
+    driverLabel: tester
+    ruleDefs:
+      - key: action
+        type: string
+        isRequired: true
+        isValueRequired: true
+      - key: message
+        type: string
+        isValueRequired: true
+  - command: Teardown
+    watchStates: Teardown
+    driverLabel: tester
+    ruleDefs:
+      - key: action
+        type: string
+        isRequired: true
+        isValueRequired: true
+      - key: message
+        type: string
+        isValueRequired: true
