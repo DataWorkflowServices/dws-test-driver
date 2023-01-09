@@ -1,0 +1,24 @@
+apiVersion: dws.cray.hpe.com/v1alpha1
+kind: Workflow
+metadata:
+  name: base
+spec:
+  # Add fields here
+  desiredState: Proposal
+  dwDirectives:
+    - "#DW Proposal action=complete"
+
+    # By specifying "error", the driver will cause the step to fail.
+    #- "#DW Proposal action=error message=dean-error"
+
+    # By specifying "wait", the driver will leave the state in DriverWait,
+    # and a test tool will transition this to "complete".
+    # The test tool acts as an extension of dws-test-driver.
+    #- "#DW Proposal action=wait"
+
+  wlmID: "5f239bd8-30db-450b-8c2c-a1a7c8631a1a"
+  jobID: 900001
+  userID: 1001
+  groupID: 1001
+
+
