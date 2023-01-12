@@ -1,0 +1,25 @@
+apiVersion: dws.cray.hpe.com/v1alpha1
+kind: Workflow
+metadata:
+  name: complex
+spec:
+  # Add fields here
+  desiredState: Proposal
+  dwDirectives:
+
+    # Use this with the config/samples/run-complex.sh script.
+
+    # This workflow will proceed through Proposal state and on to Setup state
+    # where it will remain with a status of DriverWait until a
+    # test tool moves that state to Complete.  Then this workflow will proceed
+    # to DataIn state where it will end with an error.
+
+    - "#DW Setup action=wait"
+    - "#DW DataIn action=error message=sample-data-error"
+
+  wlmID: "5f239bd8-30db-450b-8c2c-a1a7c8631a1a"
+  jobID: 900001
+  userID: 1001
+  groupID: 1001
+
+
