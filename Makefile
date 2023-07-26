@@ -1,10 +1,26 @@
+# Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+# Other additional copyright holders may be indicated within.
+#
+# The entirety of this work is licensed under the Apache License,
+# Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License.
+#
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= $(shell sed 1q .version)
+# NOTE: git-version-gen will generate a value for VERSION, unless you override it.
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
@@ -12,9 +28,6 @@ VERSION ?= $(shell sed 1q .version)
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # cray.hpe.com/dws-operator-bundle:$VERSION and cray.hpe.com/dws-operator-catalog:$VERSION.
 IMAGE_TAG_BASE ?= ghcr.io/dataworkflowservices/dws-test-driver-operator
-
-# Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.25.0
@@ -84,7 +97,8 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 .PHONY: container-unit-test
-container-unit-test: ## Build docker image with the manager and execute unit tests.
+container-unit-test: VERSION ?= $(shell cat .version)
+container-unit-test: .version ## Build docker image with the manager and execute unit tests.
 	docker build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
 	docker run --rm -t --name $@-dws-test-driver  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
@@ -92,17 +106,20 @@ container-unit-test: ## Build docker image with the manager and execute unit tes
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+docker-build: VERSION ?= $(shell cat .version)
+docker-build: test .version ## Build docker image with the manager.
+	docker build -t ${IMAGE_TAG_BASE}:${VERSION} .
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+docker-push: VERSION ?= $(shell cat .version)
+docker-push: .version ## Push docker image with the manager.
+	docker push ${IMAGE_TAG_BASE}:${VERSION}
 
 .PHONY: kind-push
 KIND_CLUSTER ?= "kind"
-kind-push: ## Push docker image to kind
-	kind load docker-image --name $(KIND_CLUSTER) --nodes `kubectl get node -l cray.wlm.manager=true --no-headers -o custom-columns=":metadata.name" | paste -d, -s -` ${IMG}
+kind-push: VERSION ?= $(shell cat .version)
+kind-push: .version ## Push docker image to kind
+	kind load docker-image --name $(KIND_CLUSTER) ${IMAGE_TAG_BASE}:${VERSION}
 
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -128,13 +145,23 @@ ifndef ignore-not-found
 endif
 
 .PHONY: deploy
-deploy: kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+deploy: VERSION ?= $(shell cat .version)
+deploy: .version kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMAGE_TAG_BASE}:${VERSION}
 	$(KUSTOMIZE) build config/top | kubectl apply -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/top | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+
+# Let .version be phony so that a git update to the workarea can be reflected
+# in it each time it's needed.
+.PHONY: .version
+.version: ## Uses the git-version-gen script to generate a tag version
+	./git-version-gen --fallback `git rev-parse HEAD` > .version
+
+clean:
+	rm -f .version
 
 ##@ Build Dependencies
 

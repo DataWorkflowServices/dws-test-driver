@@ -20,3 +20,7 @@ bin
 
 # .vscode files
 .vscode
+
+.version
+cover.out
+
