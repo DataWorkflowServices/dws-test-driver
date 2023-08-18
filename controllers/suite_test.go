@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Hewlett Packard Enterprise Development LP.
+Copyright 2022-2023 Hewlett Packard Enterprise Development LP.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
+	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
 	dwsctrls "github.com/HewlettPackard/dws/controllers"
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
@@ -60,8 +60,8 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Controller Suite")
 }
 
-func loadTestDWDirectiveRuleset(filename string) (dwsv1alpha1.DWDirectiveRule, error) {
-	ruleset := dwsv1alpha1.DWDirectiveRule{}
+func loadTestDWDirectiveRuleset(filename string) (dwsv1alpha2.DWDirectiveRule, error) {
+	ruleset := dwsv1alpha2.DWDirectiveRule{}
 
 	bytes, err := os.ReadFile(filename)
 	if err != nil {
@@ -100,7 +100,7 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	//+kubebuilder:scaffold:scheme
-	err = dwsv1alpha1.AddToScheme(scheme.Scheme)
+	err = dwsv1alpha2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -119,7 +119,7 @@ var _ = BeforeSuite(func() {
 
 	// start reconcilers
 
-	err = (&dwsv1alpha1.Workflow{}).SetupWebhookWithManager(k8sManager)
+	err = (&dwsv1alpha2.Workflow{}).SetupWebhookWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&WorkflowReconciler{
@@ -135,9 +135,6 @@ var _ = BeforeSuite(func() {
 		Scheme: testEnv.Scheme,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
-
-	k8sClient = k8sManager.GetClient()
-	Expect(k8sClient).ToNot(BeNil())
 
 	go func() {
 		defer GinkgoRecover()

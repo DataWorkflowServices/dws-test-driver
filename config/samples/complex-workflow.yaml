@@ -1,4 +1,4 @@
-apiVersion: dws.cray.hpe.com/v1alpha1
+apiVersion: dws.cray.hpe.com/v1alpha2
 kind: Workflow
 metadata:
   name: complex
@@ -15,10 +15,13 @@ spec:
     # to DataIn state where it will end with an error.
 
     - "#DW Setup action=wait"
-    - "#DW DataIn action=error message=sample-data-error"
 
-  wlmID: "5f239bd8-30db-450b-8c2c-a1a7c8631a1a"
-  jobID: 900001
+    # Note that underscores are used in the error message to represent
+    # spaces; the controller will swap them back when it records the error.
+    - "#DW DataIn action=error message=sample_data_error severity=Fatal"
+
+  wlmID: "TD WLM"
+  jobID: "TD Job 27"
   userID: 1001
   groupID: 1001
 

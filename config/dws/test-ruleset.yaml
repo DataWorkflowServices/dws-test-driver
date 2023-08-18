@@ -1,4 +1,4 @@
-apiVersion: dws.cray.hpe.com/v1alpha1
+apiVersion: dws.cray.hpe.com/v1alpha2
 kind: DWDirectiveRule
 metadata:
   name: rules
@@ -14,6 +14,9 @@ spec:
       - key: message
         type: string
         isValueRequired: true
+      - key: severity
+        type: string
+        isValueRequired: true
   - command: Setup
     watchStates: Setup
     driverLabel: tester
@@ -23,6 +26,9 @@ spec:
         isRequired: true
         isValueRequired: true
       - key: message
+        type: string
+        isValueRequired: true
+      - key: severity
         type: string
         isValueRequired: true
   - command: DataIn
@@ -36,6 +42,9 @@ spec:
       - key: message
         type: string
         isValueRequired: true
+      - key: severity
+        type: string
+        isValueRequired: true
   - command: PreRun
     watchStates: PreRun
     driverLabel: tester
@@ -45,6 +54,9 @@ spec:
         isRequired: true
         isValueRequired: true
       - key: message
+        type: string
+        isValueRequired: true
+      - key: severity
         type: string
         isValueRequired: true
   - command: PostRun
@@ -58,6 +70,9 @@ spec:
       - key: message
         type: string
         isValueRequired: true
+      - key: severity
+        type: string
+        isValueRequired: true
   - command: DataOut
     watchStates: DataOut
     driverLabel: tester
@@ -69,6 +84,9 @@ spec:
       - key: message
         type: string
         isValueRequired: true
+      - key: severity
+        type: string
+        isValueRequired: true
   - command: Teardown
     watchStates: Teardown
     driverLabel: tester
@@ -78,5 +96,8 @@ spec:
         isRequired: true
         isValueRequired: true
       - key: message
+        type: string
+        isValueRequired: true
+      - key: severity
         type: string
         isValueRequired: true
