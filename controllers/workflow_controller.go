@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Hewlett Packard Enterprise Development LP.
+Copyright 2022-2023 Hewlett Packard Enterprise Development LP.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	dwsv1alpha1 "github.com/HewlettPackard/dws/api/v1alpha1"
+	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
 	dwdparse "github.com/HewlettPackard/dws/utils/dwdparse"
 	"github.com/HewlettPackard/dws/utils/updater"
 	"github.com/go-logr/logr"
@@ -55,7 +55,7 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 	log.Info("Reconciling Workflow")
 
 	// Fetch the Workflow workflow
-	workflow := &dwsv1alpha1.Workflow{}
+	workflow := &dwsv1alpha2.Workflow{}
 	if err := r.Get(ctx, req.NamespacedName, workflow); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -82,7 +82,7 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 	// Create a status updater that handles the call to r.Update() if any of the fields
 	// in workflow.Status{} change. This is necessary since Status is not a subresource
 	// of the workflow.
-	statusUpdater := updater.NewStatusUpdater[*dwsv1alpha1.WorkflowStatus](workflow)
+	statusUpdater := updater.NewStatusUpdater[*dwsv1alpha2.WorkflowStatus](workflow)
 	defer func() { err = statusUpdater.CloseWithUpdate(ctx, r, err) }()
 
 	// Check workflow for test driver entries
@@ -104,7 +104,7 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 		}
 
 		// Skip driverStatus entries with recorded errors
-		if dwsv1alpha1.StatusError == driverStatus.Status {
+		if dwsv1alpha2.StatusError == driverStatus.Status {
 			continue
 		}
 
@@ -119,7 +119,7 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 		case args["action"] == "complete":
 			log.Info("Completing workflow")
 			driverStatus.Completed = true
-			driverStatus.Status = dwsv1alpha1.StatusCompleted
+			driverStatus.Status = dwsv1alpha2.StatusCompleted
 			ct := metav1.NowMicro()
 			driverStatus.CompleteTime = &ct
 		case args["action"] == "wait":
@@ -129,8 +129,28 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 			continue
 		case args["action"] == "error":
 			log.Info("Failing workflow")
-			driverStatus.Status = dwsv1alpha1.StatusError
+			driverStatus.Message = "Reported error: " + args["message"]
+			// Errors are found on the #DW line with
+			// underscores representing spaces, which allows the
+			// #DW parser to be simple; the controller will swap
+			// those back to spaces.
 			driverStatus.Error = strings.ReplaceAll(args["message"], "_", " ")
+
+			var severity string
+			var present bool
+			severity, present = args["severity"]
+			if !present {
+				severity = ""
+			}
+			status, err := dwsv1alpha2.SeverityStringToStatus(severity)
+			if err != nil {
+				driverStatus.Status = dwsv1alpha2.StatusError
+				driverStatus.Message = "Internal error: " + err.Error()
+				driverStatus.Error = err.Error()
+			} else {
+				driverStatus.Status = status
+			}
+
 		default:
 			log.Error(err, "Unsupported action in directive", "directive", directive)
 			return ctrl.Result{}, err
@@ -145,6 +165,6 @@ func (r *WorkflowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 // SetupWithManager sets up the controller with the Manager.
 func (r *WorkflowReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&dwsv1alpha1.Workflow{}).
+		For(&dwsv1alpha2.Workflow{}).
 		Complete(r)
 }
