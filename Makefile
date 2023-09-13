@@ -26,8 +26,8 @@
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# cray.hpe.com/dws-operator-bundle:$VERSION and cray.hpe.com/dws-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= ghcr.io/dataworkflowservices/dws-test-driver-operator
+# cray.hpe.com/dws-bundle:$VERSION and cray.hpe.com/dws-catalog:$VERSION.
+IMAGE_TAG_BASE ?= ghcr.io/dataworkflowservices/dws-test-driver
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26.0

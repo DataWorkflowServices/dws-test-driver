@@ -1,12 +1,12 @@
-# github.com/HewlettPackard/dws v0.0.11
+# github.com/DataWorkflowServices/dws v0.0.1-0.20230913204342-e78d55d24550
 ## explicit; go 1.19
-github.com/HewlettPackard/dws/api/v1alpha2
-github.com/HewlettPackard/dws/config/crd/bases
-github.com/HewlettPackard/dws/config/webhook
-github.com/HewlettPackard/dws/controllers
-github.com/HewlettPackard/dws/controllers/metrics
-github.com/HewlettPackard/dws/utils/dwdparse
-github.com/HewlettPackard/dws/utils/updater
+github.com/DataWorkflowServices/dws/api/v1alpha2
+github.com/DataWorkflowServices/dws/config/crd/bases
+github.com/DataWorkflowServices/dws/config/webhook
+github.com/DataWorkflowServices/dws/controllers
+github.com/DataWorkflowServices/dws/controllers/metrics
+github.com/DataWorkflowServices/dws/utils/dwdparse
+github.com/DataWorkflowServices/dws/utils/updater
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
