@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
-	dwsctrls "github.com/HewlettPackard/dws/controllers"
+	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
+	dwsctrls "github.com/DataWorkflowServices/dws/controllers"
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,8 +41,8 @@ import (
 
 	//+kubebuilder:scaffold:imports
 
-	_ "github.com/HewlettPackard/dws/config/crd/bases"
-	_ "github.com/HewlettPackard/dws/config/webhook"
+	_ "github.com/DataWorkflowServices/dws/config/crd/bases"
+	_ "github.com/DataWorkflowServices/dws/config/webhook"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -80,7 +80,7 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	webhookPaths := []string{
-		filepath.Join("..", "vendor", "github.com", "HewlettPackard", "dws", "config", "webhook"),
+		filepath.Join("..", "vendor", "github.com", "DataWorkflowServices", "dws", "config", "webhook"),
 	}
 
 	By("bootstrapping test environment")
@@ -89,7 +89,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
 			// filepath.Join("..", "config", "crd", "bases"),
-			filepath.Join("..", "vendor", "github.com", "HewlettPackard", "dws", "config", "crd", "bases"),
+			filepath.Join("..", "vendor", "github.com", "DataWorkflowServices", "dws", "config", "crd", "bases"),
 		},
 	}
 
