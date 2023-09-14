@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
+	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
 )
 
 func ignoreExactTime(x, y *metav1.MicroTime) bool {

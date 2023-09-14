@@ -20,9 +20,9 @@ import (
 	"context"
 	"strings"
 
-	dwsv1alpha2 "github.com/HewlettPackard/dws/api/v1alpha2"
-	dwdparse "github.com/HewlettPackard/dws/utils/dwdparse"
-	"github.com/HewlettPackard/dws/utils/updater"
+	dwsv1alpha2 "github.com/DataWorkflowServices/dws/api/v1alpha2"
+	dwdparse "github.com/DataWorkflowServices/dws/utils/dwdparse"
+	"github.com/DataWorkflowServices/dws/utils/updater"
 	"github.com/go-logr/logr"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +39,7 @@ type WorkflowReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=dws.cray.hpe.com,resources=workflows,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=dataworkflowservices.github.io,resources=workflows,verbs=get;list;watch;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
