@@ -3,7 +3,7 @@ module github.com/DataWorkflowServices/dws-test-driver
 go 1.19
 
 require (
-	github.com/DataWorkflowServices/dws v0.0.1-0.20230913204342-e78d55d24550
+	github.com/DataWorkflowServices/dws v0.0.13
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.4
 	github.com/google/go-cmp v0.5.9
