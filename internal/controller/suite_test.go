@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -81,7 +81,7 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	webhookPaths := []string{
-		filepath.Join("..", "vendor", "github.com", "DataWorkflowServices", "dws", "config", "webhook"),
+		filepath.Join("..", "..", "vendor", "github.com", "DataWorkflowServices", "dws", "config", "webhook"),
 	}
 
 	By("bootstrapping test environment")
@@ -90,7 +90,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 		CRDDirectoryPaths: []string{
 			// filepath.Join("..", "config", "crd", "bases"),
-			filepath.Join("..", "vendor", "github.com", "DataWorkflowServices", "dws", "config", "crd", "bases"),
+			filepath.Join("..", "..", "vendor", "github.com", "DataWorkflowServices", "dws", "config", "crd", "bases"),
 		},
 	}
 
@@ -146,7 +146,7 @@ var _ = BeforeSuite(func() {
 	}()
 
 	// Load the NNF ruleset to enable the webhook to parse #DW directives
-	ruleset, err := loadTestDWDirectiveRuleset(filepath.Join("..", "config", "dws", "test-ruleset.yaml"))
+	ruleset, err := loadTestDWDirectiveRuleset(filepath.Join("..", "..", "config", "dws", "test-ruleset.yaml"))
 	Expect(err).ToNot(HaveOccurred())
 
 	ruleset.Namespace = "default"
