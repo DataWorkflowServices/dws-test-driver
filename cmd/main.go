@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/DataWorkflowServices/dws-test-driver/controllers"
+	controllers "github.com/DataWorkflowServices/dws-test-driver/internal/controller"
 	//+kubebuilder:scaffold:imports
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
