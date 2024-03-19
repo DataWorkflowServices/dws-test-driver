@@ -22,5 +22,6 @@ bin
 .vscode
 
 .version
+config/begin/*
 cover.out
 
