@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+# Copyright 2022-2024 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -29,8 +29,10 @@
 # cray.hpe.com/dws-bundle:$VERSION and cray.hpe.com/dws-catalog:$VERSION.
 IMAGE_TAG_BASE ?= ghcr.io/dataworkflowservices/dws-test-driver
 
+OVERLAY ?= top
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.26.0
+ENVTEST_K8S_VERSION = 1.28.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -72,7 +74,8 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+#	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	echo
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -145,15 +148,18 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: edit-image
+edit-image: VERSION ?= $(shell cat .version)
+edit-image: .version
+	$(KUSTOMIZE_IMAGE_TAG) config/begin $(OVERLAY) $(IMAGE_TAG_BASE) $(VERSION)
+
 .PHONY: deploy
-deploy: VERSION ?= $(shell cat .version)
-deploy: .version kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMAGE_TAG_BASE}:${VERSION}
-	$(KUSTOMIZE) build config/top | kubectl apply -f -
+deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/begin | kubectl apply -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/top | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/$(OVERLAY) | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 # Let .version be phony so that a git update to the workarea can be reflected
 # in it each time it's needed.
@@ -178,6 +184,7 @@ clean-bin:
 	fi
 
 ## Tool Binaries
+KUSTOMIZE_IMAGE_TAG ?= ./hack/make-kustomization.sh
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
