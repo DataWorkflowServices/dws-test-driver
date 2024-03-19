@@ -41,6 +41,12 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# $(CONTAINER_TOOL) defines the container tool to be used for building images.
+# Be aware that the target commands are only tested with Docker which is
+# scaffolded by default. However, you might want to replace it to use other
+# tools. (i.e. podman)
+CONTAINER_TOOL ?= docker
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
@@ -101,45 +107,45 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: container-unit-test
 container-unit-test: VERSION ?= $(shell cat .version)
-container-unit-test: .version ## Build docker image with the manager and execute unit tests.
-	docker build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
-	docker run --rm -t --name $@-dws-test-driver  $(IMAGE_TAG_BASE)-$@:$(VERSION)
+container-unit-test: .version ## Build $(CONTAINER_TOOL) image with the manager and execute unit tests.
+	$(CONTAINER_TOOL) build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
+	$(CONTAINER_TOOL) run --rm -t --name $@-dws-test-driver  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
+# (i.e. $(CONTAINER_TOOL) build --platform linux/arm64 ). However, you must enable $(CONTAINER_TOOL) buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: VERSION ?= $(shell cat .version)
-docker-build: test .version ## Build docker image with the manager.
-	docker build -t ${IMAGE_TAG_BASE}:${VERSION} .
+docker-build: test .version ## Build $(CONTAINER_TOOL) image with the manager.
+	$(CONTAINER_TOOL) build -t ${IMAGE_TAG_BASE}:${VERSION} .
 
 .PHONY: docker-push
 docker-push: VERSION ?= $(shell cat .version)
-docker-push: .version ## Push docker image with the manager.
-	docker push ${IMAGE_TAG_BASE}:${VERSION}
+docker-push: .version ## Push $(CONTAINER_TOOL) image with the manager.
+	$(CONTAINER_TOOL) push ${IMAGE_TAG_BASE}:${VERSION}
 
 .PHONY: kind-push
 KIND_CLUSTER ?= "kind"
 kind-push: VERSION ?= $(shell cat .version)
-kind-push: .version ## Push docker image to kind
+kind-push: .version ## Push $(CONTAINER_TOOL) image to kind
 	kind load docker-image --name $(KIND_CLUSTER) ${IMAGE_TAG_BASE}:${VERSION}
 
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
+# - able to use $(CONTAINER_TOOL) buildx . More info: https://docs.docker.com/build/buildx/
 # - have enable BuildKit, More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 # - be able to push the image for your registry (i.e. if you do not inform a valid value via IMG=<myregistry/image:<tag>> than the export will fail)
 # To properly provided solutions that supports more than one platform you should use this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
 docker-buildx: VERSION ?= $(shell cat .version)
-docker-buildx: .version test ## Build and push docker image for the manager for cross-platform support
+docker-buildx: .version test ## Build and push $(CONTAINER_TOOL) image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- docker buildx create --name project-v3-builder
-	docker buildx use project-v3-builder
-	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross
-	- docker buildx rm project-v3-builder
+	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
+	$(CONTAINER_TOOL) buildx use project-v3-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMAGE_TAG_BASE}:${VERSION} -f Dockerfile.cross
+	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 	rm Dockerfile.cross
 
 ##@ Deployment
