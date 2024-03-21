@@ -1,12 +1,12 @@
 domain: cray.hpe.com
 layout:
-- go.kubebuilder.io/v3
+- go.kubebuilder.io/v4
 projectName: dws-test-driver
 repo: github.com/DataWorkflowServices/dws-test-driver
 resources:
 - controller: true
-  domain: cray.hpe.com
-  group: dws
+  domain: github.io
+  group: dataworkflowservices
   kind: Workflow
-  version: v1alpha1
+  version: v1alpha2
 version: "3"
