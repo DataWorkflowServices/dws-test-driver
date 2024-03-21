@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+# Copyright 2022-2024 Hewlett Packard Enterprise Development LP
 # Other additional copyright holders may be indicated within.
 #
 # The entirety of this work is licensed under the Apache License,
@@ -29,8 +29,10 @@
 # cray.hpe.com/dws-bundle:$VERSION and cray.hpe.com/dws-catalog:$VERSION.
 IMAGE_TAG_BASE ?= ghcr.io/dataworkflowservices/dws-test-driver
 
+OVERLAY ?= top
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.26.0
+ENVTEST_K8S_VERSION = 1.28.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -38,6 +40,12 @@ GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
+
+# $(CONTAINER_TOOL) defines the container tool to be used for building images.
+# Be aware that the target commands are only tested with Docker which is
+# scaffolded by default. However, you might want to replace it to use other
+# tools. (i.e. podman)
+CONTAINER_TOOL ?= docker
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -72,7 +80,8 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+#	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	echo
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -90,53 +99,53 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	go build -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	go run cmd/main.go
 
 .PHONY: container-unit-test
 container-unit-test: VERSION ?= $(shell cat .version)
-container-unit-test: .version ## Build docker image with the manager and execute unit tests.
-	docker build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
-	docker run --rm -t --name $@-dws-test-driver  $(IMAGE_TAG_BASE)-$@:$(VERSION)
+container-unit-test: .version ## Build $(CONTAINER_TOOL) image with the manager and execute unit tests.
+	$(CONTAINER_TOOL) build -f Dockerfile --label $(IMAGE_TAG_BASE)-$@:$(VERSION)-$@ -t $(IMAGE_TAG_BASE)-$@:$(VERSION) --target testing .
+	$(CONTAINER_TOOL) run --rm -t --name $@-dws-test-driver  $(IMAGE_TAG_BASE)-$@:$(VERSION)
 
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
+# (i.e. $(CONTAINER_TOOL) build --platform linux/arm64 ). However, you must enable $(CONTAINER_TOOL) buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: VERSION ?= $(shell cat .version)
-docker-build: test .version ## Build docker image with the manager.
-	docker build -t ${IMAGE_TAG_BASE}:${VERSION} .
+docker-build: test .version ## Build $(CONTAINER_TOOL) image with the manager.
+	$(CONTAINER_TOOL) build -t ${IMAGE_TAG_BASE}:${VERSION} .
 
 .PHONY: docker-push
 docker-push: VERSION ?= $(shell cat .version)
-docker-push: .version ## Push docker image with the manager.
-	docker push ${IMAGE_TAG_BASE}:${VERSION}
+docker-push: .version ## Push $(CONTAINER_TOOL) image with the manager.
+	$(CONTAINER_TOOL) push ${IMAGE_TAG_BASE}:${VERSION}
 
 .PHONY: kind-push
 KIND_CLUSTER ?= "kind"
 kind-push: VERSION ?= $(shell cat .version)
-kind-push: .version ## Push docker image to kind
+kind-push: .version ## Push $(CONTAINER_TOOL) image to kind
 	kind load docker-image --name $(KIND_CLUSTER) ${IMAGE_TAG_BASE}:${VERSION}
 
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - able to use docker buildx . More info: https://docs.docker.com/build/buildx/
+# - able to use $(CONTAINER_TOOL) buildx . More info: https://docs.docker.com/build/buildx/
 # - have enable BuildKit, More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 # - be able to push the image for your registry (i.e. if you do not inform a valid value via IMG=<myregistry/image:<tag>> than the export will fail)
 # To properly provided solutions that supports more than one platform you should use this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
 docker-buildx: VERSION ?= $(shell cat .version)
-docker-buildx: .version test ## Build and push docker image for the manager for cross-platform support
+docker-buildx: .version test ## Build and push $(CONTAINER_TOOL) image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- docker buildx create --name project-v3-builder
-	docker buildx use project-v3-builder
-	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross
-	- docker buildx rm project-v3-builder
+	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
+	$(CONTAINER_TOOL) buildx use project-v3-builder
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMAGE_TAG_BASE}:${VERSION} -f Dockerfile.cross
+	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 	rm Dockerfile.cross
 
 ##@ Deployment
@@ -145,15 +154,18 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: edit-image
+edit-image: VERSION ?= $(shell cat .version)
+edit-image: .version
+	$(KUSTOMIZE_IMAGE_TAG) config/begin $(OVERLAY) $(IMAGE_TAG_BASE) $(VERSION)
+
 .PHONY: deploy
-deploy: VERSION ?= $(shell cat .version)
-deploy: .version kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMAGE_TAG_BASE}:${VERSION}
-	$(KUSTOMIZE) build config/top | kubectl apply -f -
+deploy: kustomize edit-image ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/begin | kubectl apply -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/top | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/$(OVERLAY) | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 # Let .version be phony so that a git update to the workarea can be reflected
 # in it each time it's needed.
@@ -178,18 +190,19 @@ clean-bin:
 	fi
 
 ## Tool Binaries
+KUSTOMIZE_IMAGE_TAG ?= ./hack/make-kustomization.sh
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v4.5.7
-CONTROLLER_TOOLS_VERSION ?= v0.12.0
+KUSTOMIZE_VERSION ?= v5.1.1
+CONTROLLER_TOOLS_VERSION ?= v0.13.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
 kustomize: $(LOCALBIN) ## Download kustomize locally if necessary.
-	if [[ ! -s $(LOCALBIN)/kustomize || $$($(LOCALBIN)/kustomize version | awk '{print $$1}' | awk -F/ '{print $$2}') != $(KUSTOMIZE_VERSION) ]]; then \
+	if [[ ! -s $(LOCALBIN)/kustomize || ! $$($(LOCALBIN)/kustomize version) =~ $(KUSTOMIZE_VERSION) ]]; then \
 	  rm -f $(LOCALBIN)/kustomize && \
 	  { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }; \
 	fi
